@@ -1,0 +1,6 @@
+# Ignore generated files
+zig-out
+.zig-cache
+
+# Ignore jlox source files
+*.jlox

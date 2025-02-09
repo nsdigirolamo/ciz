@@ -1,24 +1,45 @@
 const std = @import("std");
 
 pub fn main() !void {
-    // Prints to stderr (it's a shortcut based on `std.io.getStdErr()`)
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
-
-    // stdout is for the actual output of your application, for example if you
-    // are implementing gzip, then only the compressed bytes should be sent to
-    // stdout, not any debugging messages.
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
-
-    try stdout.print("Run `zig build test` to run the tests.\n", .{});
-
-    try bw.flush(); // don't forget to flush!
+    if (std.os.argv.len > 2) {
+        std.debug.print("Usage: jlox [script]\n", .{});
+        std.process.exit(64);
+    } else if (std.os.argv.len == 2) {
+        const path = std.mem.span(std.os.argv[1]);
+        try runFile(path);
+    } else {
+        try runPrompt();
+    }
 }
 
-test "simple test" {
-    var list = std.ArrayList(i32).init(std.testing.allocator);
-    defer list.deinit(); // try commenting this out and see if zig detects the memory leak!
-    try list.append(42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
+fn runFile(path: []const u8) !void {
+    // Get allocator.
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+    defer {
+        _ = gpa.deinit();
+    }
+
+    // Open source code file.
+    const source_file = try std.fs.cwd().openFile(path, .{});
+    defer source_file.close();
+
+    // Read the file into a buffer.
+    const stat = try source_file.stat();
+    const buffer = try source_file.readToEndAlloc(allocator, stat.size);
+    defer allocator.free(buffer);
+
+    // Run the code.
+    run(buffer);
+}
+
+fn runPrompt() !void {
+    // TODO: Write the interactive shell.
+}
+
+fn run(source: []const u8) void {
+    var lines = std.mem.splitAny(u8, source, "\r\n");
+    while (lines.next()) |line| {
+        std.debug.print("{s}\n", .{line});
+    }
 }
