@@ -2,7 +2,7 @@ const std = @import("std");
 
 pub fn main() !void {
     if (std.os.argv.len > 2) {
-        std.debug.print("Usage: jlox [script]\n", .{});
+        try std.io.getStdOut().writeAll("Usage: jlox [script]\n");
         std.process.exit(64);
     } else if (std.os.argv.len == 2) {
         const path = std.mem.span(std.os.argv[1]);
@@ -34,7 +34,12 @@ fn runFile(path: []const u8) !void {
 }
 
 fn runPrompt() !void {
-    // TODO: Write the interactive shell.
+    var buffer: [1024]u8 = undefined;
+    while (true) {
+        try std.io.getStdOut().writeAll("> ");
+        const line = (try std.io.getStdIn().reader().readUntilDelimiterOrEof(&buffer, '\n')).?;
+        run(line);
+    }
 }
 
 fn run(source: []const u8) void {
