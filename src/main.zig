@@ -1,7 +1,59 @@
 const std = @import("std");
 
-const ResultTag = enum { ErrorReport, OK };
-const Result = union(ResultTag) {
+const Result = enum { ErrorReport, OK };
+
+const Token = enum {
+    // single character tokens
+    LEFT_PAREN,
+    RIGHT_PAREN,
+    LEFT_BRACE,
+    RIGHT_BRACE,
+    COMMA,
+    DOT,
+    MINUS,
+    PLUS,
+    SEMICOLON,
+    SLASH,
+    STAR,
+
+    // One or two character tokens
+    BANG,
+    BANG_EQUAL,
+    EQUAL,
+    EQUAL_EQUAL,
+    GREATER,
+    GREATER_EQUAL,
+    LESS,
+    LESS_EQUAL,
+
+    // Literals
+    IDENTIFIER,
+    STRING,
+    NUMBER,
+
+    // Keywords
+    AND,
+    CLASS,
+    ELSE,
+    FALSE,
+    FUN,
+    FOR,
+    IF,
+    NIL,
+    OR,
+    PRINT,
+    RETURN,
+    SUPER,
+    THIS,
+    TRUE,
+    VAR,
+    WHILE,
+
+    // Misc
+    EOF,
+};
+
+const Report = union(Result) {
     ErrorReport: struct {
         line: i32,
         where: []const u8,
@@ -31,7 +83,7 @@ pub fn main() !void {
     }
 }
 
-fn runFile(path: []const u8) !Result {
+fn runFile(path: []const u8) !Report {
     // Get allocator.
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
@@ -52,7 +104,7 @@ fn runFile(path: []const u8) !Result {
     return try run(buffer);
 }
 
-fn runPrompt() !Result {
+fn runPrompt() !Report {
     var buffer: [1024]u8 = undefined;
     while (true) {
         try std.io.getStdOut().writeAll("> ");
@@ -60,13 +112,13 @@ fn runPrompt() !Result {
         const result = try run(line);
         if (result == .ErrorReport) return result;
     }
-    return Result{ .OK = .{} };
+    return Report{ .OK = .{} };
 }
 
-fn run(source: []const u8) !Result {
+fn run(source: []const u8) !Report {
     var lines = std.mem.splitAny(u8, source, "\r\n");
     while (lines.next()) |line| {
         try std.io.getStdOut().writer().print("{s}\n", .{line});
     }
-    return Result{ .OK = .{} };
+    return Report{ .OK = .{} };
 }
