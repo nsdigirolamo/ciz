@@ -1,64 +1,11 @@
 const std = @import("std");
 
-const Result = enum { ErrorReport, OK };
+const Error = @import("error.zig").Error;
 
-const Token = enum {
-    // single character tokens
-    LEFT_PAREN,
-    RIGHT_PAREN,
-    LEFT_BRACE,
-    RIGHT_BRACE,
-    COMMA,
-    DOT,
-    MINUS,
-    PLUS,
-    SEMICOLON,
-    SLASH,
-    STAR,
-
-    // One or two character tokens
-    BANG,
-    BANG_EQUAL,
-    EQUAL,
-    EQUAL_EQUAL,
-    GREATER,
-    GREATER_EQUAL,
-    LESS,
-    LESS_EQUAL,
-
-    // Literals
-    IDENTIFIER,
-    STRING,
-    NUMBER,
-
-    // Keywords
-    AND,
-    CLASS,
-    ELSE,
-    FALSE,
-    FUN,
-    FOR,
-    IF,
-    NIL,
-    OR,
-    PRINT,
-    RETURN,
-    SUPER,
-    THIS,
-    TRUE,
-    VAR,
-    WHILE,
-
-    // Misc
-    EOF,
-};
+pub const Result = enum { Error, OK };
 
 const Report = union(Result) {
-    ErrorReport: struct {
-        line: i32,
-        where: []const u8,
-        message: []const u8,
-    },
+    Error: Error,
     OK: struct {},
 };
 
@@ -74,8 +21,8 @@ pub fn main() !void {
         try runPrompt();
 
     switch (result) {
-        .ErrorReport => |err| {
-            try std.io.getStdErr().writer().print("[line {d}] Error {s}: {s}\n", .{ err.line, err.where, err.message });
+        .Error => |err| {
+            try std.io.getStdErr().writer().print("[line {d}] Error: {s}\n", .{ err.line, err.message });
         },
         .OK => {
             try std.io.getStdOut().writeAll("Success.\n");
@@ -100,8 +47,19 @@ fn runFile(path: []const u8) !Report {
     const buffer = try source_file.readToEndAlloc(allocator, stat.size);
     defer allocator.free(buffer);
 
+    const scanner = @import("scanner.zig");
+    const report = scanner.scan(buffer);
+    switch (report) {
+        .Error => |err| {
+            return Report{ .Error = err };
+        },
+        .OK => {
+            return Report{ .OK = .{} };
+        },
+    }
+
     // Run the code.
-    return try run(buffer);
+    // return try run(buffer);
 }
 
 fn runPrompt() !Report {
@@ -110,7 +68,7 @@ fn runPrompt() !Report {
         try std.io.getStdOut().writeAll("> ");
         const line = (try std.io.getStdIn().reader().readUntilDelimiterOrEof(&buffer, '\n')).?;
         const result = try run(line);
-        if (result == .ErrorReport) return result;
+        if (result == .Error) return result;
     }
     return Report{ .OK = .{} };
 }
