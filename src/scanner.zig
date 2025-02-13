@@ -1,3 +1,5 @@
+const std = @import("std");
+
 const Error = @import("error.zig").Error;
 const Result = @import("main.zig").Result;
 
@@ -56,23 +58,45 @@ const Report = union(Result) {
     Error: Error,
     OK: struct {
         tokens: []const Token,
-        consumed: i32,
+        source: []const u8,
     },
 };
 
-pub fn scan(source: []const u8) Report {
-    return scanForToken(source);
+// TODO: Make scanner be responsible for the memory allocated to ArrayList
+
+pub fn scan(allocator: std.mem.Allocator, source: []const u8) !Report {
+    var tokens = std.ArrayList(Token).init(allocator);
+
+    var current_source = source;
+    while (current_source.len > 0) {
+        const report = next(current_source);
+        switch (report) {
+            .Error => {
+                tokens.deinit();
+                return report;
+            },
+            .OK => |ok| {
+                try tokens.appendSlice(ok.tokens);
+                current_source = ok.source;
+            },
+        }
+    }
+
+    const sliced_tokens = try tokens.toOwnedSlice();
+    return Report{ .OK = .{ .tokens = sliced_tokens, .source = current_source } };
 }
 
-pub fn scanForToken(source: []const u8) Report {
+fn next(source: []const u8) Report {
     const char = source[0];
     const token = switch (char) {
         '(' => Token.LEFT_PAREN,
-        else => {
-            return Report{ .Error = .{ .line = 0, .message = "unknown character" } };
-        },
+        ')' => Token.RIGHT_PAREN,
+        else => null,
     };
-    const tokens = [1]Token{token};
 
-    return Report{ .OK = .{ .tokens = &tokens, .consumed = 1 } };
+    if (token) |t| {
+        return Report{ .OK = .{ .tokens = &[1]Token{t}, .source = source[1..] } };
+    } else {
+        return Report{ .Error = .{ .line = 0, .message = "Unknown character." } };
+    }
 }
