@@ -1,11 +1,11 @@
 const std = @import("std");
 
 const Error = @import("error.zig").Error;
-const scanner = @import("scanner.zig");
+const Scanner = @import("scanner.zig").Scanner;
 
 pub const Result = enum { Error, OK };
 
-const Report = union(Result) {
+pub const Report = union(Result) {
     Error: Error,
     OK: struct {},
 };
@@ -48,16 +48,11 @@ fn runFile(path: []const u8) !Report {
     const buffer = try source_file.readToEndAlloc(allocator, stat.size);
     defer allocator.free(buffer);
 
-    const report = try scanner.scan(allocator, buffer);
-    switch (report) {
-        .Error => |err| {
-            return Report{ .Error = err };
-        },
-        .OK => |ok| {
-            allocator.free(ok.tokens);
-            return Report{ .OK = .{} };
-        },
-    }
+    var scanner = Scanner.init(allocator);
+    defer scanner.deinit();
+
+    const report = try scanner.scan(buffer);
+    return report;
 
     // Run the code.
     // return try run(buffer);

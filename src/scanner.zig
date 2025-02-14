@@ -1,7 +1,6 @@
 const std = @import("std");
 
-const Error = @import("error.zig").Error;
-const Result = @import("main.zig").Result;
+const Report = @import("main.zig").Report;
 
 const Token = enum {
     // single character tokens
@@ -54,49 +53,52 @@ const Token = enum {
     EOF,
 };
 
-const Report = union(Result) {
-    Error: Error,
-    OK: struct {
-        tokens: []const Token,
-        source: []const u8,
-    },
+const Scanned = struct {
+    tokens: []const Token,
+    next_source: []const u8,
 };
 
-// TODO: Make scanner be responsible for the memory allocated to ArrayList
+pub const Scanner = struct {
+    allocator: std.mem.Allocator,
+    tokens: std.ArrayList(Token),
 
-pub fn scan(allocator: std.mem.Allocator, source: []const u8) !Report {
-    var tokens = std.ArrayList(Token).init(allocator);
-
-    var current_source = source;
-    while (current_source.len > 0) {
-        const report = next(current_source);
-        switch (report) {
-            .Error => {
-                tokens.deinit();
-                return report;
-            },
-            .OK => |ok| {
-                try tokens.appendSlice(ok.tokens);
-                current_source = ok.source;
-            },
-        }
+    pub fn init(allocator: std.mem.Allocator) Scanner {
+        return Scanner{
+            .allocator = allocator,
+            .tokens = std.ArrayList(Token).init(allocator)
+        };
     }
 
-    const sliced_tokens = try tokens.toOwnedSlice();
-    return Report{ .OK = .{ .tokens = sliced_tokens, .source = current_source } };
-}
+    pub fn deinit(self: *Scanner) void {
+        self.tokens.deinit();
+    }
 
-fn next(source: []const u8) Report {
+    pub fn scan(self: *Scanner, source: []const u8) !Report {
+        var next_source = source;
+        while (next_source.len > 0) {
+            if (next(next_source)) |scanned| {
+                next_source = scanned.next_source;
+                try self.tokens.appendSlice(scanned.tokens);
+            } else {
+                return Report{ .Error = .{ .line = 0, .message = "Unknown character" } };
+            }
+        }
+        return Report{ .OK = .{} };
+    }
+};
+
+fn next(source: []const u8) ?Scanned {
     const char = source[0];
-    const token = switch (char) {
+    const scanned = switch (char) {
         '(' => Token.LEFT_PAREN,
         ')' => Token.RIGHT_PAREN,
         else => null,
     };
 
-    if (token) |t| {
-        return Report{ .OK = .{ .tokens = &[1]Token{t}, .source = source[1..] } };
+    if (scanned) |token| {
+        return Scanned{ .tokens = &[1]Token{token}, .next_source = source[1..] };
     } else {
-        return Report{ .Error = .{ .line = 0, .message = "Unknown character." } };
+        return null;
     }
 }
+
