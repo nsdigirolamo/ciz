@@ -47,6 +47,9 @@ fn runFile(path: []const u8) !?Error {
             return err;
         },
         .OK => |tokens| {
+            for (tokens.items) |token| {
+                try std.io.getStdErr().writer().print("Token: {s}\n", .{token.value});
+            }
             tokens.deinit();
             return null;
         }
